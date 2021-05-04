@@ -35,6 +35,7 @@ public final class SqOperation: Operation {
 
     private let constraints: [JobConstraint]
     private let listener: JobListener?
+    private let lock = Lock()
 
     /// Current number of repetition. Transient value
     internal var currentRepetition: Int = 0
@@ -52,20 +53,24 @@ public final class SqOperation: Operation {
 
     private var jobIsExecuting: Bool = false
     public override var isExecuting: Bool {
-        get { jobIsExecuting }
+        get {
+            lock.synchronized { jobIsExecuting }
+        }
         set {
             willChangeValue(forKey: "isExecuting")
-            jobIsExecuting = newValue
+            lock.synchronized { jobIsExecuting = newValue }
             didChangeValue(forKey: "isExecuting")
         }
     }
 
     private var jobIsFinished: Bool = false
     public override var isFinished: Bool {
-        get { jobIsFinished }
+        get {
+            lock.synchronized { jobIsFinished }
+        }
         set {
             willChangeValue(forKey: "isFinished")
-            jobIsFinished = newValue
+            lock.synchronized { jobIsFinished = newValue }
             didChangeValue(forKey: "isFinished")
         }
     }
@@ -100,7 +105,9 @@ public final class SqOperation: Operation {
 
     func cancel(with: Error) {
         logger.log(.verbose, jobId: name, message: "Job has been canceled")
-        lastError = with
+        lock.synchronized {
+            lastError = with
+        }
         onTerminate()
         super.cancel()
     }
@@ -115,7 +122,9 @@ public final class SqOperation: Operation {
     // cancel before schedule and serialize
     internal func abort(error: Error) {
         logger.log(.verbose, jobId: name, message: "Job has not been scheduled due to \(error.localizedDescription)")
-        lastError = error
+        lock.synchronized {
+            lastError = error
+        }
         // Need to be called manually since the task is actually not in the queue. So cannot call cancel()
         handler.onRemove(result: .fail(error))
         listener?.onTerminated(job: info, result: .fail(error))
@@ -151,7 +160,10 @@ public final class SqOperation: Operation {
     }
 
     internal func remove() {
-        let result = lastError.map(JobCompletion.fail) ?? JobCompletion.success
+        let result = lock.synchronized {
+            lastError.map(JobCompletion.fail) ?? JobCompletion.success
+        }
+
         logger.log(.verbose, jobId: name, message: "Job is removed from the queue result=\(result)")
         handler.onRemove(result: result)
         listener?.onTerminated(job: info, result: result)
@@ -176,7 +188,9 @@ extension SqOperation: JobResult {
 
     private func completionFail(error: Error) {
         logger.log(.warning, jobId: name, message: "Job completed with error \(error.localizedDescription)")
-        lastError = error
+        lock.synchronized {
+            lastError = error
+        }
 
         if let constraint: JobRetryConstraint = getConstraint(info) {
             constraint.onCompletionFail(sqOperation: self, error: error)
@@ -187,7 +201,9 @@ extension SqOperation: JobResult {
 
     private func completionSuccess() {
         logger.log(.verbose, jobId: name, message: "Job completed successfully")
-        lastError = nil
+        lock.synchronized {
+            lastError = nil
+        }
         currentRepetition = 0
 
         if let constraint: RepeatConstraint = getConstraint(info) {
