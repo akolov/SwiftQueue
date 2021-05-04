@@ -27,6 +27,7 @@ import XCTest
 class ConstraintTestCharging: XCTestCase {
 
     func testChargingConstraintShouldRunNow() {
+        #if !targetEnvironment(simulator)
         let (type, job) = (UUID().uuidString, TestJob())
 
         let creator = TestCreator([type: job])
@@ -38,6 +39,7 @@ class ConstraintTestCharging: XCTestCase {
 
         job.awaitForRemoval()
         job.assertSingleCompletion()
+        #endif
     }
 
 }
