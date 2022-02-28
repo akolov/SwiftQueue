@@ -151,9 +151,9 @@ class TestJobFail: TestJob {
 }
 
 class TestCreator: JobCreator {
-    private let job: [String: TestJob]
+    private let job: [String: Job]
 
-    public init(_ job: [String: TestJob]) {
+    public init(_ job: [String: Job]) {
         self.job = job
     }
 
@@ -193,9 +193,14 @@ class PersisterTracker: UserDefaultsPersister {
 
 class JobListenerTest: JobListener {
 
+    var onJobScheduled: [JobInfo] = [JobInfo]()
     var onBeforeRun: [JobInfo] = [JobInfo]()
     var onAfterRun: [(JobInfo, JobCompletion)] = [(JobInfo, JobCompletion)]()
     var onTerminated: [(JobInfo, JobCompletion)] = [(JobInfo, JobCompletion)]()
+
+    func onJobScheduled(job: JobInfo) {
+        onJobScheduled.append(job)
+    }
 
     func onBeforeRun(job: JobInfo) {
         onBeforeRun.append(job)

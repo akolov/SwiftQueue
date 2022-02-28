@@ -107,6 +107,35 @@ public protocol Job {
 
 }
 
+class LambdaJob: Job {
+
+    private let lambda: () throws -> Void
+    private let retry: RetryConstraint
+
+    public init(retry: RetryConstraint = .cancel, lambda: @escaping () -> Void) {
+        self.lambda = lambda
+        self.retry = retry
+    }
+
+    func onRun(callback: JobResult) {
+        do {
+            try lambda()
+            callback.done(.success)
+        } catch let error {
+            callback.done(.fail(error))
+        }
+    }
+
+    func onRetry(error: Error) -> RetryConstraint {
+        return retry
+    }
+
+    func onRemove(result: JobCompletion) {
+        /// Nothing
+    }
+}
+
+
 public protocol Queue {
 
     var name: String { get }
@@ -157,6 +186,9 @@ extension BasicQueue: Queue {
 
 /// Listen from job status
 public protocol JobListener {
+
+    /// Job is added to the queue
+    func onJobScheduled(job: JobInfo)
 
     /// Job will start executing
     func onBeforeRun(job: JobInfo)
